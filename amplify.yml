@@ -1,21 +1,31 @@
-version: 0.1
+version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:
     preBuild:
       commands:
-        - corepack enable
-        - yarn set version stable
-        - yarn install --frozen-lockfile
+        - echo "Installing Flutter SDK"
+        - git clone https://github.com/flutter/flutter.git -b stable --depth 1
+        - export PATH="$PATH:$(pwd)/flutter/bin"
+        - flutter config --no-analytics
+        - flutter doctor
+        - echo "Installing dependencies"
+        - flutter pub get
+        - echo "Generating backend connection"
+        - npx ampx generate outputs --format dart --out-dir lib --branch $AWS_BRANCH --app-id $AWS_APP_ID
     build:
       commands:
-        - echo "BUILD_ENV=$BUILD_ENV" >> .env.custom
-        - node -e 'console.log(`node heap limit = ${require("v8").getHeapStatistics().heap_size_limit / (1024 * 1024)} Mb`)'
-        - NODE_ENV=production yarn build:release
+        - echo "Building Flutter web application"
+        - flutter build web
   artifacts:
-    # IMPORTANT - Please verify your build output directory
-    baseDirectory: /client/www/next-build
+    baseDirectory: build/web
     files:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
+      - flutter/.pub-cache
